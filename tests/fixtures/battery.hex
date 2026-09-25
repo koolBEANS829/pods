@@ -1,0 +1,5 @@
+# Captured 2026-09-25. Right bud worn (primary), left bud + case not reporting.
+# right 10% discharging | left disconnected | case disconnected
+0400040004000302010a020104010004010801000401
+# 4s later: right dropped to 9%
+04000400040003020109020104010004010801000401
