@@ -1,0 +1,58 @@
+#!/usr/bin/python3
+# Must be Fedora's own Python: Homebrew's python3 has no Bluetooth sockets.
+"""pods — AirPods controller.
+
+  pods run    the app (started at login by pods.service)
+"""
+import logging
+import os
+import signal
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # find pods_app/ even through the ~/.local/bin symlink
+
+log = logging.getLogger("pods")
+
+
+def describe(ev):
+    from pods_app import aap
+    if isinstance(ev, aap.Battery):
+        def pct(level):
+            if level.percent is None:
+                return "—"
+            return f"{level.percent}%" + (" charging" if level.charging else "")
+        return f"battery: left {pct(ev.left)}, right {pct(ev.right)}, case {pct(ev.case)}"
+    if isinstance(ev, aap.Ear):
+        return f"ear: primary {ev.primary}, secondary {ev.secondary}"
+    if isinstance(ev, aap.Noise):
+        return f"noise: {ev.mode}"
+    return repr(ev)
+
+
+def run():
+    from PySide6.QtWidgets import QApplication
+    from pods_app.link import Link
+
+    logging.basicConfig(level=logging.DEBUG if os.environ.get("PODS_DEBUG") else logging.INFO,
+                        format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    signal.signal(signal.SIGINT, signal.SIG_DFL)  # Ctrl+C quits even while Qt is busy
+    app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
+
+    link = Link()
+    link.up.connect(lambda: log.info("link up"))
+    link.event.connect(lambda ev: log.info(describe(ev)))
+    link.start()
+    return app.exec()
+
+
+def main(argv):
+    if argv == ["run"]:
+        return run()
+    print(__doc__.strip(), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
