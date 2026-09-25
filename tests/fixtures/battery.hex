@@ -3,3 +3,8 @@
 0400040004000302010a020104010004010801000401
 # 4s later: right dropped to 9%
 04000400040003020109020104010004010801000401
+# Captured 2026-09-25, right bud dropped into the case. Right 8% charging; left
+# disconnected; case disconnected with a junk level byte of 0xff (must read "—", not 255%).
+04000400040003020108010104010004010801ff0401
+# A second later: left 100% charging, right 8% charging, case 35% not charging.
+04000400040003020108010104016401010801230201

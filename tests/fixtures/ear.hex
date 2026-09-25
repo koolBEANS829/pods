@@ -1,2 +1,9 @@
 # Captured 2026-09-25. primary in ear (00), secondary disconnected (03).
 0400040006000003
+# Captured 2026-09-25 during a hardware check (right bud worn, left in the case):
+# bud taken out: primary out (01), secondary gone (03)
+0400040006000103
+# bud dropped into the case: primary case (02), secondary gone
+0400040006000203
+# both buds in the case
+0400040006000202

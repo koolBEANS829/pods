@@ -5,7 +5,7 @@ After=graphical-session.target
 
 [Service]
 ExecStart=%h/projects/pods/pods run
-Restart=on-failure
+Restart=always
 RestartSec=2
 
 [Install]

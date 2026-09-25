@@ -5,7 +5,7 @@ the pointer is. Right-click menus are drawn by Plasma itself, at the icon.)
 """
 from PySide6.QtCore import QObject
 from PySide6.QtGui import QAction, QActionGroup, QIcon
-from PySide6.QtWidgets import QMenu, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from . import aap
 from .control import battery_text
@@ -32,6 +32,9 @@ class Tray(QObject):
             self.menu.addAction(action)
             self.modes[mode] = action
 
+        # Plasma's tray holds a Qt "quit lock" while the icon shows; hiding the icon
+        # releases it, and Qt's default is then to quit the whole app. Never do that.
+        QApplication.instance().setQuitLockEnabled(False)
         self.icon = QSystemTrayIcon(QIcon.fromTheme("audio-headphones"))
         self.icon.setContextMenu(self.menu)
         self.icon.setToolTip(link.name)

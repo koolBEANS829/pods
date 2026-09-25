@@ -41,6 +41,23 @@ class RealPackets(unittest.TestCase):
     def test_ear_secondary_disconnected(self):
         self.assertEqual(aap.parse(packets("ear")[0]), aap.Ear("in", "gone"))
 
+    def test_ear_out_then_case_then_both_in_case(self):
+        self.assertEqual([aap.parse(p) for p in packets("ear")[1:]],
+                         [aap.Ear("out", "gone"), aap.Ear("case", "gone"), aap.Ear("case", "case")])
+
+    def test_stem_mode_changes(self):
+        self.assertEqual([aap.parse(p) for p in packets("noise")[1:]], [aap.Noise("off"), aap.Noise("adaptive")])
+
+    def test_battery_disconnected_case_with_junk_level(self):
+        b = aap.parse(packets("battery")[2])
+        self.assertEqual(b.case, aap.Level(None, charging=False))
+        self.assertEqual(b.right, aap.Level(8, charging=True))
+
+    def test_battery_all_three_reporting(self):
+        b = aap.parse(packets("battery")[3])
+        self.assertEqual((b.left, b.right, b.case),
+                         (aap.Level(100, True), aap.Level(8, True), aap.Level(35, False)))
+
 
 class Malformed(unittest.TestCase):
     def test_unknown_packet_is_ignored(self):

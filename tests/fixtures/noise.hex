@@ -1,2 +1,7 @@
 # Captured 2026-09-25. Mode 02 = noise cancellation.
 0400040009000d02000000
+# Captured 2026-09-25, long-presses on the stem:
+# off
+0400040009000d01000000
+# adaptive
+0400040009000d04000000
