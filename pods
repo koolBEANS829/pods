@@ -38,6 +38,7 @@ def run():
     from pods_app.control import AlreadyRunning, Control
     from pods_app.link import Link
     from pods_app.media import EarPause, Media
+    from pods_app.tray import Tray
 
     logging.basicConfig(level=logging.DEBUG if os.environ.get("PODS_DEBUG") else logging.INFO,
                         format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -53,6 +54,7 @@ def run():
         print(e, file=sys.stderr)
         return 1
 
+    tray = Tray(link)  # noqa: F841  (kept alive for the life of the app)
     ear_pause = EarPause(config.load()["pause_when"])
     media = Media()
 

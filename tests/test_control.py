@@ -3,13 +3,14 @@ import tempfile
 import threading
 import unittest
 
-from PySide6.QtCore import QCoreApplication, QEventLoop, QObject, QTimer, Signal
+from PySide6.QtCore import QEventLoop, QObject, QTimer, Signal
+from PySide6.QtWidgets import QApplication
 
 from pods_app import aap
 from pods_app.client import ask
 from pods_app.control import AlreadyRunning, Control
 
-app = QCoreApplication.instance() or QCoreApplication([])
+app = QApplication.instance() or QApplication([])
 
 
 class FakeLink(QObject):
