@@ -2,7 +2,10 @@
 # Must be Fedora's own Python: Homebrew's python3 has no Bluetooth sockets.
 """pods — AirPods controller.
 
-  pods run    the app (started at login by pods.service)
+  pods anc | transparency | adaptive | off    set noise control
+  pods battery                                 left / right / case
+  pods status                                  connection, mode, battery
+  pods run                                     the app (started at login by pods.service)
 """
 import logging
 import os
@@ -12,17 +15,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # find pods_app/ even through the ~/.local/bin symlink
 
+from pods_app.client import COMMANDS, ask, socket_path  # noqa: E402  (stdlib only — keeps the CLI fast)
+
 log = logging.getLogger("pods")
 
 
 def describe(ev):
     from pods_app import aap
+    from pods_app.control import battery_text
     if isinstance(ev, aap.Battery):
-        def pct(level):
-            if level.percent is None:
-                return "—"
-            return f"{level.percent}%" + (" charging" if level.charging else "")
-        return f"battery: left {pct(ev.left)}, right {pct(ev.right)}, case {pct(ev.case)}"
+        return "battery: " + battery_text(ev).replace("\n", "  ")
     if isinstance(ev, aap.Ear):
         return f"ear: primary {ev.primary}, secondary {ev.secondary}"
     if isinstance(ev, aap.Noise):
@@ -32,6 +34,7 @@ def describe(ev):
 
 def run():
     from PySide6.QtWidgets import QApplication
+    from pods_app.control import AlreadyRunning, Control
     from pods_app.link import Link
 
     logging.basicConfig(level=logging.DEBUG if os.environ.get("PODS_DEBUG") else logging.INFO,
@@ -41,17 +44,34 @@ def run():
     app.setQuitOnLastWindowClosed(False)
 
     link = Link()
+    control = Control(link, socket_path())
+    try:
+        control.listen()
+    except AlreadyRunning as e:
+        print(e, file=sys.stderr)
+        return 1
+
     link.up.connect(lambda: log.info("link up"))
+    link.down.connect(lambda: log.info("link lost"))
     link.event.connect(lambda ev: log.info(describe(ev)))
     link.start()
-    return app.exec()
+    code = app.exec()
+    control.close()
+    return code
 
 
 def main(argv):
     if argv == ["run"]:
         return run()
-    print(__doc__.strip(), file=sys.stderr)
-    return 1
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        return 0
+    if len(argv) != 1 or argv[0] not in COMMANDS:
+        print(f"pods: unknown command '{' '.join(argv)}' (try: {', '.join(COMMANDS)})", file=sys.stderr)
+        return 1
+    ok, text = ask(socket_path(), argv[0])
+    print(text, file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
