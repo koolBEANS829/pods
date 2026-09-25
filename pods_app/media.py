@@ -69,8 +69,10 @@ class Media:
         msg = QDBusMessage.createMethodCall(player, "/org/mpris/MediaPlayer2",
                                             "org.freedesktop.DBus.Properties", "Get")
         msg.setArguments(["org.mpris.MediaPlayer2.Player", "PlaybackStatus"])
-        reply = self.bus.call(msg, QDBus.CallMode.Block, TIMEOUT_MS).arguments()
-        return reply[0].variant() if reply else None
+        reply = self.bus.call(msg, QDBus.CallMode.Block, TIMEOUT_MS)
+        if reply.type() != QDBusMessage.MessageType.ReplyMessage:
+            return None  # the player vanished or hung; an error's first argument is its text, not a status
+        return reply.arguments()[0].variant()
 
     def _call(self, player, method):
         msg = QDBusMessage.createMethodCall(player, "/org/mpris/MediaPlayer2",

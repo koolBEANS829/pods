@@ -78,5 +78,38 @@ class Config(unittest.TestCase):
         self.assertEqual(config.load(self.write('pause_when = \n')), {"pause_when": "one"})
 
 
+class BrokenPlayers(unittest.TestCase):
+    """A player that errors or hangs must not break ear-pause (review finding I1).
+
+    Only ever asks for PlaybackStatus of fake names: never pauses a real player.
+    """
+
+    def setUp(self):
+        from PySide6.QtWidgets import QApplication
+        self.app = QApplication.instance() or QApplication([])
+        from pods_app.media import Media
+        self.media = Media()
+
+    def test_vanished_player_has_no_status(self):
+        self.assertIsNone(self.media._status("org.mpris.MediaPlayer2.podstest_gone"))
+
+    def test_hung_player_has_no_status(self):
+        import subprocess
+        import sys
+        name = f"org.mpris.MediaPlayer2.podstest_hung{os.getpid()}"
+        hung = subprocess.Popen([sys.executable, "-c", f"""
+import sys, time
+from PySide6.QtCore import QCoreApplication
+from PySide6.QtDBus import QDBusConnection
+app = QCoreApplication([])
+QDBusConnection.sessionBus().registerService("{name}")
+print("ready", flush=True)
+time.sleep(10)  # owns the name but never answers, like a frozen browser
+"""], stdout=subprocess.PIPE, text=True)
+        self.addCleanup(hung.kill)
+        self.assertEqual(hung.stdout.readline().strip(), "ready")
+        self.assertIsNone(self.media._status(name))
+
+
 if __name__ == "__main__":
     unittest.main()

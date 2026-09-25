@@ -2,6 +2,9 @@
 Description=pods — AirPods controller (tray, noise modes, ear-detect pause)
 PartOf=graphical-session.target
 After=graphical-session.target
+# A startup that fails every time must stop, not respawn every 2.5s forever.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 ExecStart=%h/projects/pods/pods run

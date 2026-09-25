@@ -1,6 +1,11 @@
 import unittest
 
-from pods_app.link import AAP_UUID, Backoff, pick_device
+from PySide6.QtDBus import QDBusConnection
+from PySide6.QtWidgets import QApplication
+
+from pods_app.link import AAP_UUID, Backoff, _children, pick_device
+
+app = QApplication.instance() or QApplication([])
 
 OTHER = "0000110b-0000-1000-8000-00805f9b34fb"
 
@@ -30,6 +35,14 @@ class PickDevice(unittest.TestCase):
 
     def test_none_when_no_airpods_paired(self):
         self.assertIsNone(pick_device([("/org/bluez/hci0/dev_speaker", [OTHER], True)]))
+
+
+class BluezNotAnswering(unittest.TestCase):
+    def test_no_bluetooth_service_means_no_devices_not_a_crash(self):
+        # Review finding I2: an error reply's text went into the XML parser, which
+        # raised at startup, and systemd restarted pods every 2.5s forever.
+        bus = QDBusConnection.systemBus()
+        self.assertEqual(_children(bus, "/org/bluez", service="org.podstest.nobody"), [])
 
 
 if __name__ == "__main__":

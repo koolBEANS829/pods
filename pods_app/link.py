@@ -51,11 +51,11 @@ def pick_device(devices):
     return pods[0][0] if pods else None
 
 
-def _children(bus, path):
+def _children(bus, path, service="org.bluez"):
     """Child object paths under a BlueZ path (adapters under /org/bluez, devices under an adapter)."""
-    reply = QDBusInterface("org.bluez", path, "org.freedesktop.DBus.Introspectable", bus).call("Introspect")
-    if not reply.arguments():
-        return []
+    reply = QDBusInterface(service, path, "org.freedesktop.DBus.Introspectable", bus).call("Introspect")
+    if reply.type() != QDBusMessage.MessageType.ReplyMessage:
+        return []  # bluetoothd isn't answering; start() looks again later
     return [f"{path}/{node.get('name')}" for node in ET.fromstring(reply.arguments()[0]).findall("node")]
 
 
