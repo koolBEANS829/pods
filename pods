@@ -34,8 +34,10 @@ def describe(ev):
 
 def run():
     from PySide6.QtWidgets import QApplication
+    from pods_app import aap, config
     from pods_app.control import AlreadyRunning, Control
     from pods_app.link import Link
+    from pods_app.media import EarPause, Media
 
     logging.basicConfig(level=logging.DEBUG if os.environ.get("PODS_DEBUG") else logging.INFO,
                         format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
@@ -51,9 +53,23 @@ def run():
         print(e, file=sys.stderr)
         return 1
 
+    ear_pause = EarPause(config.load()["pause_when"])
+    media = Media()
+
+    def on_event(ev):
+        log.info(describe(ev))
+        if isinstance(ev, aap.Ear):
+            action = ear_pause.update(ev)
+            if action == "pause":
+                media.pause()
+            elif action == "resume":
+                media.resume()
+
     link.up.connect(lambda: log.info("link up"))
+    link.up.connect(ear_pause.reset)  # so the first ear packet after connecting never starts music
+    link.up.connect(media.forget)
     link.down.connect(lambda: log.info("link lost"))
-    link.event.connect(lambda ev: log.info(describe(ev)))
+    link.event.connect(on_event)
     link.start()
     code = app.exec()
     control.close()
