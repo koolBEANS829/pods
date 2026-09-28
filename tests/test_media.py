@@ -70,13 +70,47 @@ class SwitchedOff(unittest.TestCase):
         ep.enabled = True
         self.assertEqual(feed(ep, ONE_OUT), ["pause"])
 
-    def test_switching_off_while_paused_never_resumes(self):
+
+class Switching(unittest.TestCase):
+    """Flipping the switch acts on where the buds are now, not just on the next change."""
+
+    def off_then(self, pause_when, *ears):
+        ep = EarPause(pause_when)
+        self.assertIsNone(ep.switch(False))
+        feed(ep, *ears)
+        return ep
+
+    def test_on_with_a_bud_out_pauses_now_and_back_in_resumes(self):
+        ep = self.off_then("one", BOTH_IN, ONE_OUT)
+        self.assertEqual(ep.switch(True), "pause")
+        self.assertEqual(feed(ep, BOTH_IN), ["resume"])
+
+    def test_on_with_both_in_does_nothing(self):
+        self.assertIsNone(self.off_then("one", BOTH_OUT, BOTH_IN).switch(True))
+
+    def test_on_with_a_bud_in_its_case_does_nothing(self):
+        self.assertIsNone(self.off_then("one", BOTH_IN, Ear("in", "case")).switch(True))
+
+    def test_on_before_any_ear_reading_does_nothing(self):
+        self.assertIsNone(self.off_then("one").switch(True))
+
+    def test_on_in_both_mode_waits_for_both_out(self):
+        self.assertIsNone(self.off_then("both", BOTH_IN, ONE_OUT).switch(True))
+        ep = self.off_then("both", BOTH_IN, BOTH_OUT)
+        self.assertEqual(ep.switch(True), "pause")
+        self.assertEqual(feed(ep, ONE_OUT), ["resume"])
+
+    def test_off_while_paused_resumes_now(self):
         ep = EarPause("one")
         feed(ep, BOTH_IN, ONE_OUT)  # paused
-        ep.enabled = False
-        self.assertEqual(feed(ep, BOTH_IN), [None])
-        ep.enabled = True
-        self.assertEqual(feed(ep, ONE_OUT, BOTH_IN), ["pause", "resume"])
+        self.assertEqual(ep.switch(False), "resume")
+        self.assertEqual(feed(ep, BOTH_IN, ONE_OUT), [None, None])
+        self.assertEqual(ep.switch(True), "pause")
+
+    def test_off_while_not_paused_does_nothing(self):
+        ep = EarPause("one")
+        feed(ep, BOTH_IN)
+        self.assertIsNone(ep.switch(False))
 
 
 class Switch(unittest.TestCase):

@@ -59,17 +59,20 @@ def run():
     tray = Tray(link, ear=ear)  # noqa: F841  (kept alive for the life of the app)
     ear_pause = EarPause(config.load()["pause_when"])
     ear_pause.enabled = ear.on
-    ear.changed.connect(lambda on: setattr(ear_pause, "enabled", on))
     media = Media()
+
+    def act(action):
+        if action == "pause":
+            media.pause()
+        elif action == "resume":
+            media.resume()
 
     def on_event(ev):
         log.info(describe(ev))
         if isinstance(ev, aap.Ear):
-            action = ear_pause.update(ev)
-            if action == "pause":
-                media.pause()
-            elif action == "resume":
-                media.resume()
+            act(ear_pause.update(ev))
+
+    ear.changed.connect(lambda on: act(ear_pause.switch(on)))  # acts on where the buds are now
 
     link.up.connect(lambda: log.info("link up"))
     link.up.connect(ear_pause.reset)  # so the first ear packet after connecting never starts music

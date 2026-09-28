@@ -55,15 +55,16 @@ class EarPause:
     def reset(self):
         self._worn = None       # buds in ears at the last packet; None = none seen since connecting
         self._resume_at = None  # buds that must be back in to resume; None = we haven't paused
+        self._last = None       # the last ear packet, for switch()
 
     def update(self, ear):
         """Returns "pause", "resume" or None."""
         worn = [ear.primary, ear.secondary].count("in")
         before, self._worn = self._worn, worn
+        self._last = ear
         if before is None or worn == before:
             return None  # first packet after connecting, or nothing changed
         if not self.enabled:
-            self._resume_at = None  # switched off while paused: never start music by itself later
             return None
         if self._resume_at is None:
             if worn < before and (self.pause_when == "one" or worn == 0):
@@ -72,6 +73,27 @@ class EarPause:
         elif worn >= self._resume_at:
             self._resume_at = None
             return "resume"
+        return None
+
+    def switch(self, on):
+        """Turns ear pause on or off, acting on where the buds are right now.
+
+        Returns "pause" (switched on with a bud out), "resume" (switched off while
+        we're holding music paused) or None.
+        """
+        self.enabled = on
+        if not on:
+            if self._resume_at is None:
+                return None
+            self._resume_at = None
+            return "resume"
+        if self._last is None or self._resume_at is not None:
+            return None
+        buds = [self._last.primary, self._last.secondary]
+        worn, out = buds.count("in"), buds.count("out")  # a bud in its case or gone isn't "out"
+        if out and (self.pause_when == "one" or worn == 0):
+            self._resume_at = worn + out if self.pause_when == "one" else 1
+            return "pause"
         return None
 
 
