@@ -7,6 +7,9 @@ A small AirPods controller for Linux. One Python process gives you:
 - `pods battery` and `pods status`
 - **Ear-detect pause**: take a bud out and whatever is playing pauses; put it back and
   those players resume
+  - Turn it off or on with **Pause when removed** in the tray menu, or `pods ear off` /
+    `pods ear on` (`pods ear` shows it). The choice is remembered across restarts, in
+    `~/.local/state/pods/ear-pause`.
 - A **tray icon**, shown only while the AirPods are connected. Right-click it for battery
   levels and the noise modes.
 

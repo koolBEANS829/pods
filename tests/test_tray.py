@@ -1,12 +1,14 @@
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
 
 from pods_app import aap
+from pods_app.media import EarSwitch
 from pods_app.tray import Tray
 from tests.test_control import FakeLink
 
@@ -44,6 +46,35 @@ class TrayIcon(unittest.TestCase):
     def test_stem_press_moves_the_tick(self):
         self.link.event.emit(aap.Noise("adaptive"))
         self.assertEqual([m for m, a in self.tray.modes.items() if a.isChecked()], ["adaptive"])
+
+
+class EarPauseLine(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.ear = EarSwitch(os.path.join(self.dir.name, "ear-pause"))
+        self.tray = Tray(FakeLink(), ear=self.ear)
+
+    def test_ticked_while_on(self):
+        self.assertEqual(self.tray.ear_line.text(), "Pause when removed")
+        self.assertTrue(self.tray.ear_line.isChecked())
+
+    def test_click_flips_the_switch(self):
+        self.tray.ear_line.trigger()
+        self.assertFalse(self.ear.on)
+        self.assertFalse(self.tray.ear_line.isChecked())
+        self.tray.ear_line.trigger()
+        self.assertTrue(self.ear.on)
+
+    def test_follows_the_cli(self):
+        self.ear.set(False)
+        self.assertFalse(self.tray.ear_line.isChecked())
+        self.ear.set(True)
+        self.assertTrue(self.tray.ear_line.isChecked())
+
+    def test_starts_unticked_when_saved_off(self):
+        self.ear.set(False)
+        self.assertFalse(Tray(FakeLink(), ear=self.ear).ear_line.isChecked())
 
 
 class NeverQuits(unittest.TestCase):

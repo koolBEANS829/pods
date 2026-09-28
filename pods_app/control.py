@@ -26,9 +26,10 @@ def battery_text(b):
 
 
 class Control(QObject):
-    def __init__(self, link, path, confirm_ms=2000):
+    def __init__(self, link, path, confirm_ms=2000, ear=None):
         super().__init__()
         self.link = link
+        self.ear = ear                # media.EarSwitch, for `pods ear on|off`
         self.path = path
         self.confirm_ms = confirm_ms  # how long the AirPods get to confirm a mode change
         self.battery = None           # last aap.Battery
@@ -100,6 +101,10 @@ class Control(QObject):
                 self._reply(conn, True, battery_text(self.battery))
         elif line == "status":
             self._reply(conn, True, self._status())
+        elif self.ear is not None and line in ("ear", "ear on", "ear off"):
+            if line != "ear":
+                self.ear.set(line == "ear on")
+            self._reply(conn, True, self._ear_text())
         else:
             self._reply(conn, False, f"unknown command '{line}' (try: {', '.join(COMMANDS)})")
 
@@ -109,7 +114,12 @@ class Control(QObject):
         lines = [f"{self.link.name}: connected", f"noise: {self.noise or 'unknown'}"]
         if self.battery:
             lines.append(battery_text(self.battery))
+        if self.ear is not None:
+            lines.append(self._ear_text())
         return "\n".join(lines)
+
+    def _ear_text(self):
+        return "ear pause: " + ("on" if self.ear.on else "off")
 
     def _reply(self, conn, ok, text):
         self._unwait(conn)

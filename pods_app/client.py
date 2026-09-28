@@ -2,7 +2,8 @@
 import os
 import socket
 
-COMMANDS = ("anc", "transparency", "adaptive", "off", "battery", "status")
+COMMANDS = ("anc", "transparency", "adaptive", "off", "battery", "status", "ear")
+EAR_WORDS = ("on", "off")  # `pods ear on|off`; bare `pods ear` just shows it
 NOT_RUNNING = "pods isn't running (start it with: systemctl --user start pods)"
 
 

@@ -5,6 +5,7 @@
   pods anc | transparency | adaptive | off    set noise control
   pods battery                                 left / right / case
   pods status                                  connection, mode, battery
+  pods ear [on | off]                          ear-detect pause (no word: show it)
   pods run                                     the app (started at login by pods.service)
 """
 import logging
@@ -15,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # find pods_app/ even through the ~/.local/bin symlink
 
-from pods_app.client import COMMANDS, ask, socket_path  # noqa: E402  (stdlib only — keeps the CLI fast)
+from pods_app.client import COMMANDS, EAR_WORDS, ask, socket_path  # noqa: E402  (stdlib only — keeps the CLI fast)
 
 log = logging.getLogger("pods")
 
@@ -37,7 +38,7 @@ def run():
     from pods_app import aap, config
     from pods_app.control import AlreadyRunning, Control
     from pods_app.link import Link
-    from pods_app.media import EarPause, Media
+    from pods_app.media import EarPause, EarSwitch, Media
     from pods_app.tray import Tray
 
     logging.basicConfig(level=logging.DEBUG if os.environ.get("PODS_DEBUG") else logging.INFO,
@@ -47,15 +48,18 @@ def run():
     app.setQuitOnLastWindowClosed(False)
 
     link = Link()
-    control = Control(link, socket_path())
+    ear = EarSwitch()
+    control = Control(link, socket_path(), ear=ear)
     try:
         control.listen()
     except AlreadyRunning as e:
         print(e, file=sys.stderr)
         return 1
 
-    tray = Tray(link)  # noqa: F841  (kept alive for the life of the app)
+    tray = Tray(link, ear=ear)  # noqa: F841  (kept alive for the life of the app)
     ear_pause = EarPause(config.load()["pause_when"])
+    ear_pause.enabled = ear.on
+    ear.changed.connect(lambda on: setattr(ear_pause, "enabled", on))
     media = Media()
 
     def on_event(ev):
@@ -84,10 +88,11 @@ def main(argv):
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(__doc__.strip())
         return 0
-    if len(argv) != 1 or argv[0] not in COMMANDS:
+    ear_word = len(argv) == 2 and argv[0] == "ear" and argv[1] in EAR_WORDS
+    if not ear_word and (len(argv) != 1 or argv[0] not in COMMANDS):
         print(f"pods: unknown command '{' '.join(argv)}' (try: {', '.join(COMMANDS)})", file=sys.stderr)
         return 1
-    ok, text = ask(socket_path(), argv[0])
+    ok, text = ask(socket_path(), " ".join(argv))
     print(text, file=sys.stdout if ok else sys.stderr)
     return 0 if ok else 1
 

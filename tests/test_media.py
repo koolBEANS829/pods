@@ -4,7 +4,7 @@ import unittest
 
 from pods_app import config
 from pods_app.aap import Ear
-from pods_app.media import EarPause
+from pods_app.media import EarPause, EarSwitch
 
 BOTH_IN = Ear("in", "in")
 ONE_OUT = Ear("in", "out")
@@ -55,6 +55,66 @@ class PauseWhenBoth(unittest.TestCase):
 
     def test_both_out_pauses_and_either_back_resumes(self):
         self.assertEqual(feed(EarPause("both"), BOTH_IN, BOTH_OUT, ONE_OUT), [None, "pause", "resume"])
+
+
+class SwitchedOff(unittest.TestCase):
+    def test_never_pauses_or_resumes(self):
+        ep = EarPause("one")
+        ep.enabled = False
+        self.assertEqual(feed(ep, BOTH_IN, ONE_OUT, BOTH_IN, BOTH_OUT), [None, None, None, None])
+
+    def test_keeps_counting_buds_so_switching_on_mid_wear_still_pauses(self):
+        ep = EarPause("one")
+        ep.enabled = False
+        feed(ep, BOTH_OUT, BOTH_IN)
+        ep.enabled = True
+        self.assertEqual(feed(ep, ONE_OUT), ["pause"])
+
+    def test_switching_off_while_paused_never_resumes(self):
+        ep = EarPause("one")
+        feed(ep, BOTH_IN, ONE_OUT)  # paused
+        ep.enabled = False
+        self.assertEqual(feed(ep, BOTH_IN), [None])
+        ep.enabled = True
+        self.assertEqual(feed(ep, ONE_OUT, BOTH_IN), ["pause", "resume"])
+
+
+class Switch(unittest.TestCase):
+    def setUp(self):
+        from PySide6.QtWidgets import QApplication
+        self.app = QApplication.instance() or QApplication([])
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        self.path = os.path.join(self.dir.name, "pods", "ear-pause")
+
+    def test_on_when_nothing_saved(self):
+        self.assertTrue(EarSwitch(self.path).on)
+
+    def test_off_is_remembered_across_restarts(self):
+        EarSwitch(self.path).set(False)
+        self.assertFalse(EarSwitch(self.path).on)
+        EarSwitch(self.path).set(True)
+        self.assertTrue(EarSwitch(self.path).on)
+
+    def test_garbled_file_means_on(self):
+        os.makedirs(os.path.dirname(self.path))
+        with open(self.path, "wb") as f:
+            f.write(b"\xff\xfe nope")
+        self.assertTrue(EarSwitch(self.path).on)
+
+    def test_changed_fires_only_on_a_real_change(self):
+        switch = EarSwitch(self.path)
+        seen = []
+        switch.changed.connect(seen.append)
+        switch.set(True)
+        switch.set(False)
+        switch.set(False)
+        self.assertEqual(seen, [False])
+
+    def test_unwritable_state_still_flips_for_this_run(self):
+        switch = EarSwitch("/dev/null/pods/ear-pause")
+        switch.set(False)
+        self.assertFalse(switch.on)
 
 
 class Config(unittest.TestCase):

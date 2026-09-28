@@ -15,7 +15,7 @@ MODES = [("anc", "Noise Cancellation"), ("transparency", "Transparency"),
 
 
 class Tray(QObject):
-    def __init__(self, link):
+    def __init__(self, link, ear=None):
         super().__init__()
         self.link = link
         self.noise = None
@@ -31,6 +31,13 @@ class Tray(QObject):
             action.triggered.connect(lambda _checked=False, m=mode: self._choose(m))
             self.menu.addAction(action)
             self.modes[mode] = action
+        if ear is not None:  # media.EarSwitch; `pods ear on|off` flips the same one
+            self.menu.addSeparator()
+            self.ear_line = self.menu.addAction("Pause when removed")
+            self.ear_line.setCheckable(True)
+            self.ear_line.setChecked(ear.on)
+            self.ear_line.triggered.connect(ear.set)
+            ear.changed.connect(self.ear_line.setChecked)
 
         # Plasma's tray holds a Qt "quit lock" while the icon shows; hiding the icon
         # releases it, and Qt's default is then to quit the whole app. Never do that.

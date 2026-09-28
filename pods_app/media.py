@@ -4,12 +4,44 @@ Only ever talks to media players (MPRIS over D-Bus). It never touches audio
 devices or PipeWire profiles: that is what broke LinuxPods.
 """
 import logging
+import os
+from pathlib import Path
 
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtDBus import QDBus, QDBusConnection, QDBusMessage
 
 log = logging.getLogger("pods")
 MPRIS = "org.mpris.MediaPlayer2."
 TIMEOUT_MS = 1000  # a hung player must not freeze the tray
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state") / "pods" / "ear-pause"
+
+
+class EarSwitch(QObject):
+    """Ear-detect pause on or off: flipped from the tray or `pods ear on|off`, remembered across restarts.
+
+    Saved as the word "on" or "off". No file, or anything else in it, means on.
+    """
+    changed = Signal(bool)
+
+    def __init__(self, path=STATE):
+        super().__init__()
+        self.path = Path(path)
+        try:
+            self.on = self.path.read_bytes().strip() != b"off"
+        except OSError:
+            self.on = True
+
+    def set(self, on):
+        if on == self.on:
+            return
+        self.on = on
+        log.info("ear pause: %s", "on" if on else "off")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text("on\n" if on else "off\n")
+        except OSError as e:
+            log.warning("can't save ear pause to %s: %s (it resets to on at the next start)", self.path, e)
+        self.changed.emit(on)
 
 
 class EarPause:
@@ -17,6 +49,7 @@ class EarPause:
 
     def __init__(self, pause_when):
         self.pause_when = pause_when  # "one" or "both" (see config.py)
+        self.enabled = True           # False: keep counting buds, but never pause or resume (EarSwitch)
         self.reset()
 
     def reset(self):
@@ -29,6 +62,9 @@ class EarPause:
         before, self._worn = self._worn, worn
         if before is None or worn == before:
             return None  # first packet after connecting, or nothing changed
+        if not self.enabled:
+            self._resume_at = None  # switched off while paused: never start music by itself later
+            return None
         if self._resume_at is None:
             if worn < before and (self.pause_when == "one" or worn == 0):
                 self._resume_at = before if self.pause_when == "one" else 1

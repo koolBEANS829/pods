@@ -1,7 +1,9 @@
 import os
+import subprocess
 import tempfile
 import threading
 import unittest
+from pathlib import Path
 
 from PySide6.QtCore import QEventLoop, QObject, QTimer, Signal
 from PySide6.QtWidgets import QApplication
@@ -9,6 +11,7 @@ from PySide6.QtWidgets import QApplication
 from pods_app import aap
 from pods_app.client import ask
 from pods_app.control import AlreadyRunning, Control
+from pods_app.media import EarSwitch
 
 app = QApplication.instance() or QApplication([])
 
@@ -115,6 +118,67 @@ class ControlSocket(unittest.TestCase):
         ok, text = ask_while_qt_runs(self.path, "status")
         self.assertIn("not connected", text)
         self.assertNotIn("adaptive", text)
+
+
+class EarCommands(unittest.TestCase):
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.path = os.path.join(self.dir.name, "pods.sock")
+        self.link = FakeLink()
+        self.ear = EarSwitch(os.path.join(self.dir.name, "ear-pause"))
+        self.control = Control(self.link, self.path, confirm_ms=300, ear=self.ear)
+        self.control.listen()
+
+    def tearDown(self):
+        self.control.close()
+        self.dir.cleanup()
+
+    def test_ear_shows_the_setting(self):
+        self.assertEqual(ask_while_qt_runs(self.path, "ear"), (True, "ear pause: on"))
+
+    def test_ear_off_and_on(self):
+        self.assertEqual(ask_while_qt_runs(self.path, "ear off"), (True, "ear pause: off"))
+        self.assertFalse(self.ear.on)
+        self.assertEqual(ask_while_qt_runs(self.path, "ear on"), (True, "ear pause: on"))
+        self.assertTrue(self.ear.on)
+
+    def test_works_while_the_airpods_are_away(self):
+        self.link.ready = False
+        self.assertEqual(ask_while_qt_runs(self.path, "ear off"), (True, "ear pause: off"))
+
+    def test_status_shows_it_while_connected(self):
+        self.ear.set(False)
+        ok, text = ask_while_qt_runs(self.path, "status")
+        self.assertIn("ear pause: off", text)
+
+    def test_ear_with_a_bad_word_is_an_error(self):
+        ok, text = ask_while_qt_runs(self.path, "ear maybe")
+        self.assertFalse(ok)
+        self.assertIn("unknown command", text)
+
+
+class CliArguments(unittest.TestCase):
+    """The pods script itself, with no app running: only argument checking is under test."""
+
+    def cli(self, *args):
+        with tempfile.TemporaryDirectory() as d:
+            out = subprocess.run([str(Path(__file__).parent.parent / "pods"), *args], capture_output=True,
+                                 text=True, env=dict(os.environ, XDG_RUNTIME_DIR=d), timeout=10)
+        return out.returncode, out.stderr
+
+    def test_ear_on_and_off_are_accepted(self):
+        for args in (["ear"], ["ear", "on"], ["ear", "off"]):
+            code, err = self.cli(*args)
+            self.assertIn("isn't running", err, args)  # got past argument checking to the socket
+
+    def test_ear_with_a_bad_word_is_refused(self):
+        code, err = self.cli("ear", "maybe")
+        self.assertEqual(code, 1)
+        self.assertIn("unknown command", err)
+
+    def test_other_commands_still_take_no_argument(self):
+        code, err = self.cli("anc", "on")
+        self.assertIn("unknown command", err)
 
 
 class SingleInstance(unittest.TestCase):
