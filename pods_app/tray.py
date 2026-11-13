@@ -8,7 +8,7 @@ from PySide6.QtGui import QAction, QActionGroup, QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon
 
 from . import aap
-from .control import battery_text
+from .control import battery_text, popup_text
 
 MODES = [("anc", "Noise Cancellation"), ("transparency", "Transparency"),
          ("adaptive", "Adaptive"), ("off", "Off")]
@@ -19,6 +19,7 @@ class Tray(QObject):
         super().__init__()
         self.link = link
         self.noise = None
+        self.popup_due = False  # set on connect; the first battery reading with a number pops up
         self.menu = QMenu()
         self.battery_lines = [self.menu.addAction("Left —  Right —"), self.menu.addAction("Case —")]
         for line in self.battery_lines:
@@ -52,6 +53,7 @@ class Tray(QObject):
     def _up(self):
         self.icon.setToolTip(self.link.name)
         self.icon.show()
+        self.popup_due = True
 
     def _on_event(self, ev):
         if isinstance(ev, aap.Battery):
@@ -59,6 +61,10 @@ class Tray(QObject):
             self.battery_lines[0].setText(top)
             self.battery_lines[1].setText(case)
             self.icon.setToolTip(f"{self.link.name}\n{top}\n{case}")
+            text = popup_text(ev)
+            if self.popup_due and text:
+                self.popup_due = False
+                self.icon.showMessage(self.link.name, text, self.icon.icon(), 6000)
         elif isinstance(ev, aap.Noise):
             self.noise = ev.mode
             self._tick(ev.mode)

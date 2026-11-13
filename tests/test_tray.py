@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QApplication
 
 from pods_app import aap
+from pods_app.control import popup_text
 from pods_app.media import EarSwitch
 from pods_app.tray import Tray
 from tests.test_control import FakeLink
@@ -46,6 +47,55 @@ class TrayIcon(unittest.TestCase):
     def test_stem_press_moves_the_tick(self):
         self.link.event.emit(aap.Noise("adaptive"))
         self.assertEqual([m for m, a in self.tray.modes.items() if a.isChecked()], ["adaptive"])
+
+
+def reading(left=None, right=None, case=None, charging=()):
+    level = lambda name, p: aap.Level(p, name in charging)
+    return aap.Battery(left=level("left", left), right=level("right", right),
+                       case=level("case", case), primary="right")
+
+
+class PopupText(unittest.TestCase):
+    def test_only_the_parts_that_report(self):
+        self.assertEqual(popup_text(reading(right=80, case=65, charging=("case",))),
+                         "Right 80%  ·  Case 65% charging")
+
+    def test_both_buds_no_case(self):
+        self.assertEqual(popup_text(reading(left=82, right=79)), "Left 82%  Right 79%")
+
+    def test_nothing_reporting_is_empty(self):
+        self.assertEqual(popup_text(reading()), "")
+
+
+class ConnectPopup(unittest.TestCase):
+    def setUp(self):
+        self.link = FakeLink()
+        self.tray = Tray(self.link)
+        self.shown = []
+        self.tray.icon.showMessage = lambda title, text, *_: self.shown.append((title, text))
+
+    def test_first_reading_after_connect_pops_once(self):
+        self.link.up.emit()
+        self.link.event.emit(reading(left=75, case=60))
+        self.link.event.emit(reading(left=74, case=60))
+        self.assertEqual(self.shown, [(self.link.name, "Left 75%  ·  Case 60%")])
+
+    def test_no_popup_without_a_connect(self):
+        self.link.event.emit(reading(left=75))
+        self.assertEqual(self.shown, [])
+
+    def test_empty_reading_waits_for_the_next(self):
+        self.link.up.emit()
+        self.link.event.emit(reading())
+        self.link.event.emit(reading(right=50))
+        self.assertEqual(self.shown, [(self.link.name, "Right 50%")])
+
+    def test_each_connect_gets_one(self):
+        for _ in range(2):
+            self.link.up.emit()
+            self.link.event.emit(reading(right=50))
+            self.link.down.emit()
+        self.assertEqual(len(self.shown), 2)
 
 
 class EarPauseLine(unittest.TestCase):

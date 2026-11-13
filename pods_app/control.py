@@ -25,6 +25,14 @@ def battery_text(b):
     return f"Left {pct(b.left)}  Right {pct(b.right)}\nCase {pct(b.case)}"
 
 
+def popup_text(b):
+    """The connect popup: only the parts reporting a number. "" if none are."""
+    buds = "  ".join(f"{name} {pct(level)}" for name, level in (("Left", b.left), ("Right", b.right))
+                     if level.percent is not None)
+    case = f"Case {pct(b.case)}" if b.case.percent is not None else ""
+    return "  ·  ".join(part for part in (buds, case) if part)
+
+
 class Control(QObject):
     def __init__(self, link, path, confirm_ms=2000, ear=None):
         super().__init__()
